@@ -9,19 +9,17 @@ async def main():
     
     # 1. Cấu hình task
     task = ScrapingTask(
-        keywords=["Phòng khám nha khoa"],
+        keywords=["Cafe"],
         locations=["Quận 1, Hồ Chí Minh"],
         deep_scan=True,
-        max_results=5
+        max_results=3
     )
 
-    # 2. Lựa chọn AI Service (Thường sẽ lấy từ Cài đặt của App)
-    # Ở đây giả lập chọn OpenAI
-    ai_choice = "openai" # Hoặc "local"
+    # 2. Lựa chọn AI Service
+    ai_choice = "local" # Dùng local để test không tốn key
     
     if ai_choice == "openai":
-        # Giả lập có API Key
-        ai_service = OpenAIService(api_key="sk-xxxx")
+        ai_service = OpenAIService(api_key="sk-dummy")
     else:
         ai_service = LocalAIService()
 

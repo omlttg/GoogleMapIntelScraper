@@ -1,8 +1,8 @@
 import asyncio
-from typing import List
-from .models.lead import BusinessLead, ScrapingTask
-from .engine.browser import BrowserAgent
-from .engine.ai_services import AIService
+from typing import List, Any, Optional, Callable
+from core.models.lead import BusinessLead, ScrapingTask
+from core.engine.browser import BrowserAgent
+from core.engine.ai_base import AIService
 
 class ScrapingCoordinator:
     def __init__(self, ai_service: AIService, headless: bool = True):
@@ -10,33 +10,45 @@ class ScrapingCoordinator:
         self.browser_agent = BrowserAgent(headless=headless)
         self.results: List[BusinessLead] = []
 
-    async def run_task(self, task: ScrapingTask):
+    async def run_task(self, task: ScrapingTask, on_lead_found: Optional[Callable] = None) -> List[BusinessLead]:
         print(f"[Coordinator] Bắt đầu chiến dịch quét cho {len(task.keywords)} từ khóa...")
-        await self.browser_agent.start()
+        agent = self.browser_agent
+        await agent.start()
         
         try:
             for keyword in task.keywords:
                 for location in task.locations:
-                    # Giả lập quét dữ liệu
-                    print(f"[Coordinator] Đang xử lý: {keyword} tại {location}")
-                    await self.browser_agent.search_google_maps(keyword, location)
+                    print(f"[Coordinator] Đang quét: {keyword} tại {location}")
                     
-                    # Giả lập lấy được 1 lead
-                    sample_lead = BusinessLead(
-                        name="Cửa hàng mẫu",
-                        phone="0123456789",
-                        website="http://example.com",
-                        address=f"{location}, Việt Nam"
+                    # 1. Quét danh sách cơ bản từ Google Maps
+                    raw_results = await self.browser_agent.search_google_maps(
+                        keyword, location, max_results=task.max_results
                     )
                     
-                    if task.deep_scan and sample_lead.website:
-                        intel = await self.ai_service.extract_business_intel("", sample_lead.website)
-                        sample_lead.emails = intel.get("emails", [])
-                        sample_lead.socials.facebook = intel.get("socials", {}).get("facebook")
-                        sample_lead.status = "Enriched"
-                    
-                    self.results.append(sample_lead)
-                    print(f"[Coordinator] Đã thu thập: {sample_lead.name}")
+                    for raw in raw_results:
+                        lead = BusinessLead(
+                            name=raw["name"],
+                            gmap_url=raw["gmap_url"],
+                            website=raw.get("website"),
+                            status="Scraped"
+                        )
+                        
+                        # 2. Deep Scan nếu cần (Vào website để tìm Email/Social)
+                        if task.deep_scan and lead.website:
+                            print(f"[Coordinator] Đang thực hiện Deep Scan cho: {lead.name}")
+                            html = await self.browser_agent.get_page_content(lead.website)
+                            if html:
+                                intel = await self.ai_service.extract_business_intel(html, lead.website)
+                                lead.emails = intel.get("emails", [])
+                                if intel.get("socials"):
+                                    lead.socials.facebook = intel.get("socials").get("facebook")
+                                    lead.socials.instagram = intel.get("socials").get("instagram")
+                                lead.status = "Enriched"
+                        
+                        self.results.append(lead)
+                        if on_lead_found:
+                            on_lead_found(lead)
+                        print(f"[Coordinator] Đã thu thập: {lead.name}")
 
         finally:
             await self.browser_agent.stop()

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Optional
-from .models.lead import BusinessLead
+from typing import Optional, Dict, Any
+from core.models.lead import BusinessLead
 
 class AIService(ABC):
     """
@@ -19,4 +19,4 @@ class AIService(ABC):
         """
         Trả về trạng thái hoạt động của dịch vụ AI.
         """
-        pass
+        return "Unknown"
