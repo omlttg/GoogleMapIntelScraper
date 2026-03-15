@@ -15,15 +15,23 @@ class SettingsView(ft.Column):
         
         # Form Controls - Scraper
         self.keyword_input = ft.TextField(
-            label="Từ khóa tìm kiếm (ngăn cách bởi dấu phẩy)",
+            key="keywords",
+            label="Từ khóa tìm kiếm",
+            hint_text="Ví dụ: Cafe, Nhà hàng, Spa",
+            helper_text="Các từ khóa ngăn cách bởi dấu phẩy",
+            prefix_icon=ft.Icons.SEARCH,
             border_radius=10,
-            hint_text="Ví dụ: Cafe, Nhà hàng, Spa - Nhập các lĩnh vực bạn muốn quét"
+            on_submit=self.start_scraping
         )
         
         self.location_input = ft.TextField(
+            key="location",
             label="Địa điểm quét",
             hint_text="Ví dụ: Quận 1, Hồ Chí Minh",
+            helper_text="Nhập khu vực bạn muốn tìm kiếm",
+            prefix_icon=ft.Icons.LOCATION_ON,
             border_radius=10,
+            on_submit=self.start_scraping
         )
         
         self.max_results_slider = ft.Slider(
