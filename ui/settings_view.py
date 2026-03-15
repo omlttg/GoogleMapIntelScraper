@@ -15,6 +15,7 @@ class SettingsView(ft.Column):
         
         # Form Controls - Scraper
         self.keyword_input = ft.TextField(
+            key="keywords_final",
             label="Từ khóa tìm kiếm",
             hint_text="Ví dụ: Cafe, Nhà hàng, Spa",
             helper_text="Các từ khóa ngăn cách bởi dấu phẩy",
@@ -25,6 +26,7 @@ class SettingsView(ft.Column):
         )
         
         self.location_input = ft.TextField(
+            key="location_final",
             label="Địa điểm quét",
             hint_text="Ví dụ: Quận 1, Hồ Chí Minh",
             helper_text="Nhập khu vực bạn muốn tìm kiếm",

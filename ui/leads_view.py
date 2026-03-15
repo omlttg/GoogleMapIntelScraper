@@ -35,10 +35,11 @@ class LeadsView(ft.Column):
             rows=[]
         )
         
-        self.table_container = ft.Column(
+        self.table_container = ft.ListView(
             [self.table],
-            scroll=ft.ScrollMode.ALWAYS,
             expand=True,
+            spacing=0,
+            padding=0,
         )
         
         self.controls = [
@@ -83,8 +84,11 @@ class LeadsView(ft.Column):
         if save:
             self.save_all_leads()
         
-        # Cập nhật toàn bộ view thay vì chỉ table để đảm bảo hiển thị
-        self.update()
+        # Cập nhật từ Page gốc để đảm bảo đồng bộ UI
+        if self.page:
+            self.page.update()
+        else:
+            self.update()
 
     def add_lead_row(self, lead, save=True):
         # Sync version for initial loading
