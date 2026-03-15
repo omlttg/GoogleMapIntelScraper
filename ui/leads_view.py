@@ -14,7 +14,6 @@ class LeadsView(ft.Column):
         self.load_initial_data()
         
         self.search_field = ft.TextField(
-            key="lead_search",
             hint_text="Tìm kiếm lead...",
             prefix_icon=ft.Icons.SEARCH,
             expand=True,
