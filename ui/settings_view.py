@@ -66,7 +66,8 @@ class SettingsView(ft.Column):
             ],
             value=self.config.get("active_provider", "openai"),
             border_radius=10,
-            helper_text="Chọn AI sẽ thực hiện bóc tách website (Deep Scan)."
+            helper_text="Chọn AI sẽ thực hiện bóc tách website (Deep Scan).",
+            on_change=self.on_provider_change
         )
         
         self.controls = [
@@ -116,13 +117,42 @@ class SettingsView(ft.Column):
             )
         ]
 
+    def on_provider_change(self, e):
+        # Xóa các thông báo lỗi cũ khi đổi nhà cung cấp
+        self.openai_key_input.error_text = None
+        self.gemini_key_input.error_text = None
+        self.page.update()
+
     async def start_scraping(self, e):
+        # Reset lỗi
+        self.keyword_input.error_text = None
+        self.location_input.error_text = None
+        self.openai_key_input.error_text = None
+        self.gemini_key_input.error_text = None
+
         keywords = [k.strip() for k in self.keyword_input.value.split(",") if k.strip()]
         location = self.location_input.value.strip()
         
-        if not keywords or not location:
-            self.page.snack_bar = ft.SnackBar(ft.Text("Vui lòng nhập từ khóa và địa điểm!"))
-            self.page.snack_bar.open = True
+        # 1. Kiểm tra Từ khóa & Địa điểm
+        has_error = False
+        if not keywords:
+            self.keyword_input.error_text = "Vui lòng nhập từ khóa!"
+            has_error = True
+        if not location:
+            self.location_input.error_text = "Vui lòng nhập địa điểm!"
+            has_error = True
+            
+        # 2. Kiểm tra API Key theo Nhà cung cấp nếu bật Deep Scan
+        if self.deep_scan_switch.value:
+            active_provider = self.provider_dropdown.value
+            if active_provider == "openai" and not self.openai_key_input.value:
+                self.openai_key_input.error_text = "Bạn phải nhập OpenAI API Key để dùng Deep Scan!"
+                has_error = True
+            elif active_provider == "gemini" and not self.gemini_key_input.value:
+                self.gemini_key_input.error_text = "Bạn phải nhập Gemini API Key để dùng Deep Scan!"
+                has_error = True
+        
+        if has_error:
             self.page.update()
             return
 
