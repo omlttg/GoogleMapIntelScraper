@@ -21,17 +21,24 @@ class LeadsView(ft.Column):
         )
         
         self.table = ft.DataTable(
-            expand=True,
             border=ft.border.all(1, ft.Colors.GREY_700),
             border_radius=10,
+            vertical_lines=ft.border.BorderSide(1, ft.Colors.GREY_800),
+            horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_800),
             columns=[
-                ft.DataColumn(ft.Text("Tên doanh nghiệp")),
-                ft.DataColumn(ft.Text("Website")),
-                ft.DataColumn(ft.Text("Email")),
-                ft.DataColumn(ft.Text("Trạng thái")),
-                ft.DataColumn(ft.Text("Thao tác")),
+                ft.DataColumn(ft.Text("Tên doanh nghiệp", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Website", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Email", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Trạng thái", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Thao tác", weight=ft.FontWeight.BOLD)),
             ],
             rows=[]
+        )
+        
+        self.table_container = ft.Column(
+            [self.table],
+            scroll=ft.ScrollMode.ALWAYS,
+            expand=True,
         )
         
         self.controls = [
@@ -53,8 +60,11 @@ class LeadsView(ft.Column):
             ft.Divider(),
             ft.Row([self.search_field, ft.ElevatedButton("Lọc", icon=ft.Icons.FILTER_ALT)]),
             ft.Container(
-                content=self.table,
+                content=self.table_container,
                 expand=True,
+                border=ft.border.all(1, ft.Colors.GREY_800),
+                border_radius=10,
+                padding=10,
             )
         ]
 
@@ -72,7 +82,9 @@ class LeadsView(ft.Column):
         self.table.rows.append(new_row)
         if save:
             self.save_all_leads()
-        self.table.update()
+        
+        # Cập nhật toàn bộ view thay vì chỉ table để đảm bảo hiển thị
+        self.update()
 
     def add_lead_row(self, lead, save=True):
         # Sync version for initial loading
