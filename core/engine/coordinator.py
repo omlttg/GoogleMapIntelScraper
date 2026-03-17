@@ -30,6 +30,7 @@ class ScrapingCoordinator:
                             name=raw["name"],
                             gmap_url=raw["gmap_url"],
                             website=raw.get("website"),
+                            phone=raw.get("phone"),
                             status="Scraped"
                         )
                         
@@ -47,7 +48,10 @@ class ScrapingCoordinator:
                         
                         self.results.append(lead)
                         if on_lead_found:
-                            on_lead_found(lead)
+                            if asyncio.iscoroutinefunction(on_lead_found):
+                                await on_lead_found(lead)
+                            else:
+                                on_lead_found(lead)
                         print(f"[Coordinator] Đã thu thập: {lead.name}")
 
         finally:

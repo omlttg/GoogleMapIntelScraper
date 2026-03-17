@@ -73,29 +73,30 @@ class LocalAIService(AIService):
 
 class GeminiService(AIService):
     def __init__(self, api_key: str, model: str = "gemini-1.5-flash"):
-        import google.generativeai as genai
+        from google import genai
         self.api_key = api_key
         self.model_name = model
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(model)
+        self.client = genai.Client(api_key=api_key)
 
     async def extract_business_intel(self, html_content: str, website_url: str) -> dict:
-        """Sử dụng Gemini để trích xuất email và socials."""
+        """Sử dụng Gemini (SDK mới) để trích xuất email và socials."""
         clean_html = re.sub(r'<(script|style).*?>.*?</\1>', '', html_content, flags=re.DOTALL)
-        body_content = clean_html[:15000] # Gemini có context window lớn hơn
+        body_content = clean_html[:15000]
 
         prompt = f"""
         Analyze the HTML content of this website: {website_url}
         Extract contact information:
         1. List of Emails.
-        2. Social Media Links (Facebook, Instagram).
+        2. Social Media Links (Facebook, Instagram, LinkedIn, TikTok).
 
-        Return ONLY a JSON object:
+        Return ONLY a raw JSON object string:
         {{
             "emails": ["email1", "email2"],
             "socials": {{
                 "facebook": "url",
-                "instagram": "url"
+                "instagram": "url",
+                "linkedin": "url",
+                "tiktok": "url"
             }}
         }}
         HTML Content:
@@ -103,14 +104,26 @@ class GeminiService(AIService):
         """
 
         try:
-            # Gemini response typically is in text, we need to extract JSON if it adds markdown blocks
-            response = await self.model.generate_content_async(prompt)
+            # SDK mới hỗ trợ async tự nhiên qua client.aio
+            response = await self.client.aio.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             text = response.text
-            # Clean possible markdown code blocks
-            json_str = re.search(r'\{.*\}', text, re.DOTALL).group(0)
-            return json.loads(json_str)
+            
+            # Trích xuất JSON bằng regex để an toàn
+            match = re.search(r'\{.*\}', text, re.DOTALL)
+            if match:
+                return json.loads(match.group(0))
+            else:
+                print(f"[AI] Gemini không trả về JSON hợp lệ cho {website_url}")
+                return {"emails": [], "socials": {}}
         except Exception as e:
-            print(f"[AI] Lỗi khi gọi Gemini: {e}")
+            error_msg = str(e)
+            if "429" in error_msg:
+                print(f"[AI] Lỗi Quota (429): Hết hạn mức Gemini. Vui lòng kiểm tra API Key tại Google AI Studio.")
+            else:
+                print(f"[AI] Lỗi khi gọi Gemini ({website_url}): {e}")
             return {"emails": [], "socials": {}}
 
     def get_status(self) -> str:

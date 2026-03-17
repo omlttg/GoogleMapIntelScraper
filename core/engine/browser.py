@@ -69,25 +69,86 @@ class BrowserAgent:
                         break
                         
                     el: ElementHandle = leads_elements[i]
-                    # Tìm tên doanh nghiệp
-                    name_el: Optional[ElementHandle] = await el.query_selector('div.fontHeadlineSmall')
-                    if name_el:
-                        name: str = await name_el.inner_text()
+                    
+                    try:
+                        print(f"[Browser] + Đang xử lý phần tử {i+1}...")
+                        # 1. Cuộn vào tầm nhìn
+                        try:
+                            await el.scroll_into_view_if_needed(timeout=3000)
+                        except:
+                            pass
                         
-                        # Link gmap & Website
-                        link_el: Optional[ElementHandle] = await el.query_selector('a[href*="/maps/place/"]')
-                        gmap_url: Optional[str] = await link_el.get_attribute('href') if link_el else None
+                        # 2. Click cưỡng bức với timeout ngắn 5s
+                        print(f"[Browser]   -> Click mở chi tiết...")
+                        try:
+                            # Ưu tiên click vào thẻ a hoặc tiêu đề
+                            target = await el.query_selector('a.hfpxzc')
+                            if not target: target = await el.query_selector('div.fontHeadlineSmall')
+                            if not target: target = el
+                            
+                            await target.click(force=True, timeout=5000)
+                        except Exception as click_err:
+                            print(f"[Browser]   ! Lỗi click: {click_err}")
+                            # Nếu click xịt, thử lại bằng tọa độ hoặc bỏ qua
+                            continue
+
+                        # 3. Chờ Panel chi tiết xuất hiện
+                        panel_found = False
+                        for wait_step in range(6): # Chờ tối đa 3s
+                            panel = await page.query_selector('h1.fontHeadlineLarge')
+                            if panel:
+                                panel_found = True
+                                break
+                            await asyncio.sleep(0.5)
                         
-                        # Website
-                        web_el: Optional[ElementHandle] = await el.query_selector('a[data-value="Website"]')
-                        website: Optional[str] = await web_el.get_attribute('href') if web_el else None
+                        if not panel_found:
+                            print(f"[Browser]   ! Không mở được Panel chi tiết mục {i+1}")
+                        
+                        # 4. Trích xuất dữ liệu
+                        # Lấy tên (Ưu tiên lấy từ element trong danh sách trước làm dự phòng)
+                        name = "N/A"
+                        name_el_feed = await el.query_selector('div.fontHeadlineSmall')
+                        if name_el_feed:
+                            name = await name_el_feed.inner_text()
+                            
+                        # Sau đó thử lấy từ Panel chi tiết để có tên đầy đủ/chính xác hơn
+                        name_el_panel = await page.query_selector('h1.fontHeadlineLarge')
+                        if name_el_panel: 
+                            panel_name = await name_el_panel.inner_text()
+                            if panel_name and len(panel_name) > 2:
+                                name = panel_name
+                        
+                        # Lấy URL Google Maps (lấy từ chính element gốc)
+                        gmap_url = None
+                        url_el = await el.query_selector('a.hfpxzc')
+                        if url_el: gmap_url = await url_el.get_attribute('href')
+                        if gmap_url and not gmap_url.startswith("http"):
+                            gmap_url = "https://www.google.com" + gmap_url
+                            
+                        # Lấy Website
+                        website = None
+                        web_el = await page.query_selector('a[data-item-id="authority"], a[aria-label*="Website"], a[aria-label*="Trang web"]')
+                        if web_el: website = await web_el.get_attribute('href')
+                        
+                        # Lấy Số điện thoại
+                        phone = None
+                        phone_el = await page.query_selector('button[data-item-id^="phone:tel:"], [aria-label*="Số điện thoại"], [aria-label*="Phone"]')
+                        if phone_el:
+                            label = await phone_el.get_attribute('aria-label')
+                            if label: phone = label.split(":")[-1].strip()
                         
                         results.append({
                             "name": name,
                             "gmap_url": gmap_url,
-                            "website": website
+                            "website": website,
+                            "phone": phone
                         })
-                        results_count_int = cast(int, results_count_int) + 1
+                        print(f"[Browser]   V Thu thành công: {name} | SĐT: {phone or 'N/A'}")
+                        results_count_int += 1
+                        
+                    except Exception as el_err:
+                        print(f"[Browser]   X Lỗi bỏ qua mục {i+1}: {str(el_err)}")
+                        continue
                 
                 new_h_obj: Any = await page.evaluate(f'document.querySelector("{list_selector}").scrollHeight')
                 new_height: int = cast(int, new_h_obj) if new_h_obj else 0

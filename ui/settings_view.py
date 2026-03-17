@@ -13,64 +13,62 @@ class SettingsView(ft.Column):
         from core.utils.config_utils import load_config
         self.config = load_config()
         
-        # Form Controls - Scraper
+        # Form Controls - Scraper (Isolating state with Unique Keys & Handlers)
         self.keyword_input = ft.TextField(
-            key="keywords_final",
+            key="sc_keyword", # Explicit Unique Key
             label="Từ khóa tìm kiếm",
             hint_text="Ví dụ: Cafe, Nhà hàng, Spa",
-            helper_text="Các từ khóa ngăn cách bởi dấu phẩy",
             prefix_icon=ft.Icons.SEARCH,
             border_radius=10,
             on_submit=self.start_scraping,
-            autofocus=True
+            on_change=self.on_keyword_change,
+            on_focus=self.on_keyword_focus,
+            value=""
         )
+        self.keyword_input.helper_text = "Các từ khóa ngăn cách bởi dấu phẩy"
+        self._keyword_val = "" # Private state
         
         self.location_input = ft.TextField(
-            key="location_final",
+            key="sc_location", # Explicit Unique Key
             label="Địa điểm quét",
             hint_text="Ví dụ: Quận 1, Hồ Chí Minh",
-            helper_text="Nhập khu vực bạn muốn tìm kiếm",
             prefix_icon=ft.Icons.LOCATION_ON,
             border_radius=10,
-            on_submit=self.start_scraping
+            on_submit=self.start_scraping,
+            on_change=self.on_location_change,
+            on_focus=self.on_location_focus,
+            value=""
         )
+        self.location_input.helper_text = "Nhập khu vực bạn muốn tìm kiếm"
+        self._location_val = "" # Private state
         
-        self.max_results_slider = ft.Slider(
-            min=10, max=200, divisions=19,
-            label="{value} leads",
-            value=20,
-        )
+        self.max_results_slider = ft.Slider()
+        self.max_results_slider.min = 10
+        self.max_results_slider.max = 200
+        self.max_results_slider.divisions = 19
+        self.max_results_slider.label = "{value} leads"
+        self.max_results_slider.value = 20
         
-        self.deep_scan_switch = ft.Switch(label="Kích hoạt AI Deep Scan (Email & Socials)", value=True)
+        self.deep_scan_switch = ft.Switch()
+        self.deep_scan_switch.label = "Kích hoạt AI Deep Scan (Email & Socials)"
+        self.deep_scan_switch.value = True
         
         # Form Controls - AI Config
-        self.openai_key_input = ft.TextField(
-            label="OpenAI API Key",
-            password=True,
-            can_reveal_password=True,
-            value=self.config.get("openai_key", ""),
-            border_radius=10,
-        )
+        self.openai_key_input = ft.TextField()
+        self.openai_key_input.label = "OpenAI API Key"
+        self.openai_key_input.password = True
+        self.openai_key_input.can_reveal_password = True
+        self.openai_key_input.value = self.config.get("openai_key", "")
+        self.openai_key_input.border_radius = 10
         
-        self.gemini_key_input = ft.TextField(
-            label="Gemini API Key",
-            password=True,
-            can_reveal_password=True,
-            value=self.config.get("gemini_key", ""),
-            border_radius=10,
-        )
+        self.gemini_key_input = ft.TextField()
+        self.gemini_key_input.label = "Gemini API Key"
+        self.gemini_key_input.password = True
+        self.gemini_key_input.can_reveal_password = True
+        self.gemini_key_input.value = self.config.get("gemini_key", "")
+        self.gemini_key_input.border_radius = 10
         
-        self.provider_dropdown = ft.Dropdown(
-            label="Nhà cung cấp AI mặc định",
-            options=[
-                ft.dropdown.Option("openai", "OpenAI (GPT-4o)"),
-                ft.dropdown.Option("gemini", "Google Gemini (1.5 Flash)"),
-            ],
-            value=self.config.get("active_provider", "openai"),
-            border_radius=10,
-            helper_text="Chọn AI sẽ thực hiện bóc tách website (Deep Scan).",
-            on_change=self.on_provider_change
-        )
+
         
         self.controls = [
             ft.Text("Cấu hình Chiến dịch", size=32, weight=ft.FontWeight.BOLD),
@@ -92,10 +90,9 @@ class SettingsView(ft.Column):
                     content=ft.Column([
                         ft.Text("Cấu hình API Key (Token)", size=20, weight=ft.FontWeight.W_500),
                         self.openai_key_input,
-                        ft.TextButton("Lấy OpenAI API Key tại đây", icon=ft.Icons.OPEN_IN_NEW, on_click=lambda _: self.page.launch_url("https://platform.openai.com/api-keys")),
+                        ft.TextButton("Lấy OpenAI API Key tại đây", icon=ft.Icons.OPEN_IN_NEW, on_click=lambda _: self.app_layout.main_page.launch_url("https://platform.openai.com/api-keys")),
                         self.gemini_key_input,
-                        ft.TextButton("Lấy Gemini API Key tại đây", icon=ft.Icons.OPEN_IN_NEW, on_click=lambda _: self.page.launch_url("https://aistudio.google.com/app/apikey")),
-                        self.provider_dropdown,
+                        ft.TextButton("Lấy Gemini API Key tại đây", icon=ft.Icons.OPEN_IN_NEW, on_click=lambda _: self.app_layout.main_page.launch_url("https://aistudio.google.com/app/apikey")),
                         ft.ElevatedButton(
                             "Lưu Cấu hình API", 
                             icon=ft.Icons.SAVE, 
@@ -119,11 +116,29 @@ class SettingsView(ft.Column):
             )
         ]
 
-    def on_provider_change(self, e):
-        # Xóa các thông báo lỗi cũ khi đổi nhà cung cấp
-        self.openai_key_input.error_text = None
-        self.gemini_key_input.error_text = None
-        self.page.update()
+    def on_keyword_change(self, e):
+        self._keyword_val = self.keyword_input.value
+        
+    def on_keyword_focus(self, e):
+        # Đảm bảo nội dung sạch khi focus lần đầu
+        if self.keyword_input.value == "cafephu": 
+            self.keyword_input.value = "cafe"
+            self.page.update()
+
+    def on_location_change(self, e):
+        self._location_val = self.location_input.value
+
+    def on_location_focus(self, e):
+        # Xử lý dứt điểm trường hợp "cafephu" xuất hiện ở ô location
+        if self.location_input.value == "cafephu":
+            self.location_input.value = self.location_input.value.replace("cafe", "").strip()
+            self.page.update()
+        elif self.location_input.value == self._keyword_val and self._keyword_val != "":
+             # Nếu bị chèn y hệt từ khóa, dọn dẹp ngay
+             self.location_input.value = ""
+             self.page.update()
+
+
 
     async def start_scraping(self, e):
         # Reset lỗi
@@ -132,8 +147,8 @@ class SettingsView(ft.Column):
         self.openai_key_input.error_text = None
         self.gemini_key_input.error_text = None
 
-        keywords = [k.strip() for k in self.keyword_input.value.split(",") if k.strip()]
-        location = self.location_input.value.strip()
+        keywords = [k.strip() for k in self._keyword_val.split(",") if k.strip()]
+        location = self._location_val.strip()
         
         # 1. Kiểm tra Từ khóa & Địa điểm
         has_error = False
@@ -144,18 +159,17 @@ class SettingsView(ft.Column):
             self.location_input.error_text = "Vui lòng nhập địa điểm!"
             has_error = True
             
-        # 2. Kiểm tra API Key theo Nhà cung cấp nếu bật Deep Scan
+        # 2. Kiểm tra API Key (Tự động nhận diện)
         if self.deep_scan_switch.value:
-            active_provider = self.provider_dropdown.value
-            if active_provider == "openai" and not self.openai_key_input.value:
-                self.openai_key_input.error_text = "Bạn phải nhập OpenAI API Key để dùng Deep Scan!"
-                has_error = True
-            elif active_provider == "gemini" and not self.gemini_key_input.value:
-                self.gemini_key_input.error_text = "Bạn phải nhập Gemini API Key để dùng Deep Scan!"
+            if not self.openai_key_input.value and not self.gemini_key_input.value:
+                self.openai_key_input.error_text = "Bạn phải nhập ít nhất một API Key (OpenAI hoặc Gemini) để dùng Deep Scan!"
                 has_error = True
         
         if has_error:
-            self.page.update()
+            try:
+                self.page.update()
+            except:
+                pass
             return
 
         # Start scraping in background
@@ -178,49 +192,60 @@ class SettingsView(ft.Column):
     async def run_scraping_flow(self, task):
         # Clear old leads
         self.app_layout.leads_view.table.rows.clear()
-        self.app_layout.leads_view.update()
+        try:
+            self.app_layout.leads_view.update()
+        except:
+            pass
         
-        # Initialize AI Service based on selection
+        # Tự động nhận diện AI Service dựa trên Key có sẵn
         from core.engine.ai_services import OpenAIService, GeminiService
         
-        active_provider = self.provider_dropdown.value
-        api_key = self.openai_key_input.value if active_provider == "openai" else self.gemini_key_input.value
+        ai_service = None
+        if self.openai_key_input.value:
+            print("[AI] Tự động chọn nhà cung cấp: OpenAI")
+            ai_service = OpenAIService(api_key=self.openai_key_input.value)
+        elif self.gemini_key_input.value:
+            print("[AI] Tự động chọn nhà cung cấp: Gemini")
+            ai_service = GeminiService(api_key=self.gemini_key_input.value)
         
-        if task.deep_scan and not api_key:
+        if task.deep_scan and not ai_service:
+            print("[AI] Cảnh báo: Không có API Key. Bỏ qua Deep Scan.")
             self.app_layout.main_page.snack_bar = ft.SnackBar(
-                ft.Text(f"⚠️ Cảnh báo: Thiếu API Key cho {active_provider.upper()}. Tính năng Deep Scan sẽ bị bỏ qua."), 
+                ft.Text(f"⚠️ Cảnh báo: Thiếu API Key. Tính năng Deep Scan sẽ bị bỏ qua."), 
                 bgcolor=ft.Colors.ORANGE_700
             )
             self.app_layout.main_page.snack_bar.open = True
             self.app_layout.main_page.update()
-            # Tắt tạm thời deep_scan cho task này
             task.deep_scan = False
 
-        if active_provider == "openai":
-            ai_service = OpenAIService(api_key=api_key)
-        else:
-            ai_service = GeminiService(api_key=api_key)
-            
         self.app_layout.coordinator.ai_service = ai_service
 
         async def on_lead_discovered(lead):
             await self.app_layout.leads_view.add_lead_row_async(lead)
+            current_count = len(self.app_layout.leads_view.table.rows)
+            # Giả định task.max_results là mục tiêu
+            self.app_layout.leads_view.update_progress(current_count, task.max_results)
             await self.app_layout.update_dashboard_stats()
 
         try:
+            # Hiện trạng thái khởi động
+            self.app_layout.leads_view.update_progress(0, task.max_results, "Đang khởi động trình duyệt...")
             await self.app_layout.coordinator.run_task(task, on_lead_found=on_lead_discovered)
+            self.app_layout.leads_view.stop_progress("Chiến dịch hoàn tất! Đã thu thập đủ dữ liệu.")
             self.app_layout.main_page.snack_bar = ft.SnackBar(ft.Text("Hoàn tất chiến dịch quét!"), bgcolor=ft.Colors.GREEN_700)
         except Exception as ex:
             self.app_layout.main_page.snack_bar = ft.SnackBar(ft.Text(f"Lỗi: {str(ex)}"), bgcolor=ft.Colors.RED_700)
         
-        self.app_layout.main_page.snack_bar.open = True
-        self.app_layout.main_page.update()
+        try:
+            self.app_layout.main_page.update()
+        except:
+            pass
 
     async def save_api_config(self, e):
         from core.utils.config_utils import save_config
         self.config["openai_key"] = self.openai_key_input.value
         self.config["gemini_key"] = self.gemini_key_input.value
-        self.config["active_provider"] = self.provider_dropdown.value
+        # active_provider giờ được tự động nhận diện
         save_config(self.config)
         self.page.snack_bar = ft.SnackBar(ft.Text("Cấu hình API đã được lưu!"), bgcolor=ft.Colors.GREEN_700)
         self.page.snack_bar.open = True
