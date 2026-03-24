@@ -6,12 +6,11 @@ from core.engine.coordinator import ScrapingCoordinator
 from core.engine.ai_services import OpenAIService
 from core.models.lead import ScrapingTask
 import os
-# Khắc phục lỗi treo trên Linux Native Desktop
-os.environ["FLET_LOG"] = "1"
-os.environ["FLET_DESKTOP_NO_MEDIA_KIT"] = "true"
-os.environ["FLET_DESKTOP_NO_AUDIO"] = "1"
-os.environ["GDK_BACKEND"] = "x11"  # Ép buộc dùng X11 thay vì Wayland (thường gây treo)
-os.environ["LIBGL_ALWAYS_SOFTWARE"] = "1"  # Ép buộc Software Rendering (Fix triệt để lỗi Driver GPU/Skia)
+from core.bootstrap import setup_environment
+from core.factory import ServiceFactory
+
+# Thực hiện thiết lập môi trường ngay lập tức
+setup_environment()
 
 from dotenv import load_dotenv
 import asyncio
@@ -31,7 +30,7 @@ class AppLayout(ft.Row):
         self.leads_view = LeadsView(page, app_layout=self)
         self.settings_view = SettingsView(self) # Pass app layout to settings
         
-        # page.overlay.append(self.leads_view.file_picker) # Tạm thời vô hiệu hóa do lỗi Flet version
+        # self.leads_view.file_picker is removed due to Flet version issues
         
         # Navigation Rail (Sidebar)
         self.nav_rail = ft.NavigationRail()
@@ -75,7 +74,6 @@ class AppLayout(ft.Row):
         print("[System] Bắt đầu khởi tạo không đồng bộ (Async Init)...")
         try:
             from core.utils.config_utils import load_config
-            from core.engine.ai_services import OpenAIService, GeminiService
             import asyncio
             
             # Đợi một chút để page sẵn sàng
@@ -84,25 +82,19 @@ class AppLayout(ft.Row):
             # 1. Load config
             print("[System] Milestone 1: Tải cấu hình (Config)")
             config = await asyncio.to_thread(load_config)
-            active_provider = config.get("active_provider", "openai")
-            api_key = config.get("openai_key") if active_provider == "openai" else config.get("gemini_key")
             
-            # 2. Khởi tạo AI & Coordinator
-            print("[System] Milestone 2: Khởi tạo AI Service & Coordinator")
-            if active_provider == "openai":
-                ai_service = OpenAIService(api_key=api_key or "dummy")
-            else:
-                ai_service = GeminiService(api_key=api_key or "dummy")
-            
-            self.coordinator = ScrapingCoordinator(ai_service, headless=True)
+            # 2. Khởi tạo AI & Coordinator qua Factory
+            print("[System] Milestone 2: Khởi tạo AI Service & Coordinator qua Factory")
+            ai_service = ServiceFactory.create_ai_service(config)
+            self.coordinator = ServiceFactory.create_coordinator(ai_service, headless=True)
             
             # 3. Load Leads ngầm
             print("[System] Milestone 3: Tải dữ liệu Leads cũ")
             await self.leads_view.load_initial_data()
             
             # 4. Cập nhật Dashboard
-            print("[System] Milestone 4: Cập nhật Dashboard stats")
-            await self.update_dashboard_stats()
+            print("[System] Milestone 4: Refreshing Dashboard stats")
+            await self.refresh_stats()
             print("[System] === KHỞI TẠO HOÀN TẤT - APP SẴN SÀNG ===")
             
         except Exception as e:
@@ -110,7 +102,8 @@ class AppLayout(ft.Row):
             print(f"Lỗi khởi tạo: {e}")
             traceback.print_exc()
 
-    async def update_dashboard_stats(self):
+    async def refresh_stats(self):
+        print("[System] Running refresh_stats...")
         count = len(self.leads_view.leads)
         enriched_count = sum(1 for l in self.leads_view.leads if l.status == "Enriched")
         phones_count = sum(1 for l in self.leads_view.leads if l.phone and l.phone != "N/A")
@@ -132,7 +125,7 @@ class AppLayout(ft.Row):
         
         self.nav_rail.selected_index = index
         if index == 0:
-            await self.update_dashboard_stats() # Cập nhật số liệu mới nhất khi vào Dashboard
+            await self.refresh_stats() # Cập nhật số liệu mới nhất khi vào Dashboard
             self.content_area.content = self.dashboard
         elif index == 1:
             self.content_area.content = self.leads_view

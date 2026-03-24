@@ -23,33 +23,67 @@ class LeadsView(ft.Column):
         # Load dữ liệu cũ (Sẽ được gọi async sau khi UI hiện)
         # self.load_initial_data() 
         
+        # File Picker removed due to compatibility issues on Linux
+        
         self.export_path_input = ft.TextField(
-            label="Đường dẫn lưu file (CSV)",
+            label="Đường dẫn lưu (Lưu trực tiếp không cần hộp thoại chọn file)",
             value="google_maps_leads.csv",
-            hint_text="Nhập tên file hoặc đường dẫn đầy đủ",
+            hint_text="Nhấn biểu tượng bên phải để chọn nơi lưu",
             expand=True,
             border_radius=10,
+            suffix=ft.Icon(ft.Icons.SAVE)
         )
         
         self.search_field = ft.TextField(
-            hint_text="Tìm kiếm lead...",
+            hint_text="Tìm kiếm lead theo tên, số điện thoại hoặc website...",
             prefix_icon=ft.Icons.SEARCH,
             expand=True,
             border_radius=10,
+            on_change=self.handle_search_change
         )
         
-        # Export Options - In-place menu thay vì Dialog để tránh lỗi OpenGL
-        self.export_options_container = ft.Container(
-            content=ft.Row([
-                ft.ElevatedButton("Tải CSV cục bộ", icon=ft.Icons.DOWNLOAD, on_click=self.export_csv_local_action, bgcolor=ft.Colors.BLUE_900),
-                ft.ElevatedButton("Xuất Google Sheets", icon=ft.Icons.TABLE_CHART, on_click=self.export_google_sheets_action, bgcolor=ft.Colors.GREEN_900),
-                ft.TextButton("Đóng", on_click=self.close_export_options)
-            ], spacing=20),
+        self.filter_button = ft.ElevatedButton(
+            "Lọc", 
+            icon=ft.Icons.FILTER_ALT,
+            on_click=self.handle_search_change
+        )
+        
+        # Export Panel - Unified UI for CSV and Google Sheets
+        self.export_panel = ft.Container(
+            content=ft.Column([
+                ft.Text("Cấu hình Xuất dữ liệu", size=18, weight=ft.FontWeight.BOLD),
+                self.export_path_input,
+                ft.Row([
+                    ft.ElevatedButton(
+                        "Lưu File CSV", 
+                        icon=ft.Icons.SAVE_ALT, 
+                        on_click=self.export_csv_local_action, 
+                        bgcolor=ft.Colors.BLUE_800,
+                        color=ft.Colors.WHITE,
+                        style=ft.ButtonStyle(padding=15)
+                    ),
+                    ft.ElevatedButton(
+                        "Xuất Google Sheets", 
+                        icon=ft.Icons.CLOUD_UPLOAD, 
+                        on_click=self.export_google_sheets_action, 
+                        bgcolor=ft.Colors.GREEN_800,
+                        color=ft.Colors.WHITE,
+                        style=ft.ButtonStyle(padding=15)
+                    ),
+                    ft.VerticalDivider(width=1, color=ft.Colors.GREY_700),
+                    ft.TextButton(
+                        "Hủy / Đóng", 
+                        on_click=self.close_export_options, 
+                        style=ft.ButtonStyle(color=ft.Colors.GREY_400)
+                    )
+                ], spacing=15, alignment=ft.MainAxisAlignment.START),
+            ], spacing=15),
             visible=False,
-            padding=15,
-            bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
-            border_radius=10,
-            border=ft.border.all(1, ft.Colors.BLUE_700)
+            padding=20,
+            bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
+            border_radius=12,
+            border=ft.border.all(1, ft.Colors.BLUE_900),
+            margin=ft.margin.only(bottom=15, top=5)
         )
         
         self.table = ft.DataTable(
@@ -95,21 +129,21 @@ class LeadsView(ft.Column):
                         self.progress_bar,
                     ], spacing=5),
                     ft.ElevatedButton(
-                        "XUẤT CSV", 
-                        icon=ft.Icons.FILE_DOWNLOAD,
+                        "XUẤT DỮ LIỆU", 
+                        icon=ft.Icons.IOS_SHARE,
                         on_click=self.handle_export_click,
                         style=ft.ButtonStyle(
                             color=ft.Colors.WHITE,
-                            bgcolor=ft.Colors.GREEN_700,
+                            bgcolor=ft.Colors.GREEN_800,
+                            padding=15,
                         )
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN
             ),
             ft.Divider(),
-            self.export_options_container, # Thanh menu xuất hiện in-place
-            ft.Row([self.export_path_input]),
-            ft.Row([self.search_field, ft.ElevatedButton("Lọc", icon=ft.Icons.FILTER_ALT)]),
+            self.export_panel, # Bảng điều khiển xuất thống nhất
+            ft.Row([self.search_field, self.filter_button]),
             ft.Container(
                 content=self.vertical_scroll,
                 expand=True,
@@ -118,6 +152,30 @@ class LeadsView(ft.Column):
                 padding=10,
             )
         ]
+
+    async def handle_search_change(self, e):
+        """Lọc danh sách leads dựa trên từ khóa tìm kiếm."""
+        search_query = self.search_field.value.lower().strip()
+        
+        # Xóa các hàng hiện tại trong bảng
+        self.table.rows = []
+        
+        # Lọc leads từ danh sách gốc self.leads
+        filtered_leads = []
+        for lead in self.leads:
+            if (search_query in lead.name.lower() or 
+                (lead.phone and search_query in lead.phone.lower()) or
+                (lead.website and search_query in lead.website.lower()) or
+                (lead.address and search_query in lead.address.lower())):
+                filtered_leads.append(lead)
+                self._add_row_to_table_only(lead)
+        
+        print(f"[UI] Tìm kiếm: '{search_query}' - Tìm thấy {len(filtered_leads)}/{len(self.leads)} leads")
+        
+        try:
+            self.main_page.update()
+        except:
+            pass
 
     async def add_lead_row_async(self, lead, save=True):
         self.leads.append(lead) # Lưu lại lead
@@ -180,7 +238,7 @@ class LeadsView(ft.Column):
         # Đồng bộ Dashboard
         if self.app_layout:
             self.app_layout.log_activity(f"Hệ thống sẵn sàng. Đã tải {len(self.leads)} leads từ bộ nhớ.")
-            await self.app_layout.update_dashboard_stats()
+            await self.app_layout.refresh_stats()
             
         try:
             self.main_page.update()
@@ -261,9 +319,8 @@ class LeadsView(ft.Column):
         from core.utils.persistence_utils import save_leads
         save_leads(self.leads)
 
-    async def handle_export_click(self, e):
-        """Hiển thị menu lựa chọn phương thức xuất in-place."""
-        print("[UI] Nút 'XUẤT CSV' được nhấn")
+    def handle_export_click(self, e):
+        """Hiển thị/Ẩn bảng điều khiển xuất dữ liệu."""
         if not self.leads:
             print("[UI] Không có leads để xuất")
             self.main_page.snack_bar = ft.SnackBar(ft.Text("Chưa có dữ liệu để xuất!"), bgcolor=ft.Colors.ORANGE_700)
@@ -274,38 +331,49 @@ class LeadsView(ft.Column):
                 pass
             return
 
-        self.export_options_container.visible = True
-        print("[UI] Đang hiển thị menu lựa chọn Export")
+        self.export_panel.visible = not self.export_panel.visible
         try:
             self.main_page.update()
-        except Exception as ex:
-            print(f"[UI] Lỗi update hiện menu: {ex}")
+        except:
+            pass
 
-    async def close_export_options(self, e):
-        self.export_options_container.visible = False
+    def close_export_options(self, e=None):
+        """Đóng bảng điều khiển xuất."""
+        self.export_panel.visible = False
         try:
             self.main_page.update()
         except:
             pass
 
     async def export_csv_local_action(self, e):
-        print("[UI] Bắt đầu Xuất CSV cục bộ...")
+        """Lưu file trực tiếp (FilePicker bị vô hiệu hóa để tránh treo app trên Linux)."""
         path = self.export_path_input.value.strip() or "google_maps_leads.csv"
+        # Báo hiệu đang bắt đầu
+        self.main_page.snack_bar = ft.SnackBar(ft.Text(f"📁 Đang lưu trực tiếp vào: {path}..."), bgcolor=ft.Colors.BLUE_800)
+        self.main_page.snack_bar.open = True
         await self._perform_csv_save(path)
+
+    # on_file_picker_result removed
 
     async def _perform_csv_save(self, path):
         try:
             print(f"[UI] Đang lưu vào: {path}")
+            # Hiển thị feedback đang xử lý
+            self.main_page.snack_bar = ft.SnackBar(ft.Text(f"⏳ Đang trích xuất và lưu file CSV..."), bgcolor=ft.Colors.BLUE_GREY_800)
+            self.main_page.snack_bar.open = True
+            self.main_page.update()
+
             await asyncio.to_thread(export_leads_to_csv, self.leads, path)
             print("[UI] Lưu CSV thành công")
             if self.app_layout:
                 self.app_layout.log_activity(f"Đã xuất {len(self.leads)} leads ra file CSV: {os.path.basename(path)}")
             self.main_page.snack_bar = ft.SnackBar(ft.Text(f"✅ Đã xuất CSV thành công tại: {path}"), bgcolor=ft.Colors.GREEN_700)
+            self.main_page.snack_bar.open = True
         except Exception as ex:
             print(f"[UI] Lỗi lưu CSV: {ex}")
             self.main_page.snack_bar = ft.SnackBar(ft.Text(f"❌ Lỗi: {str(ex)}"), bgcolor=ft.Colors.RED_700)
+            self.main_page.snack_bar.open = True
         
-        self.main_page.snack_bar.open = True
         try:
             self.main_page.update()
         except:
@@ -313,7 +381,8 @@ class LeadsView(ft.Column):
 
     async def export_google_sheets_action(self, e):
         print("[UI] Bắt đầu Xuất sang Google Sheets...")
-        self.main_page.snack_bar = ft.SnackBar(ft.Text("🚀 Đang đẩy dữ liệu lên Google Sheets..."))
+        self.export_panel.visible = False # Ẩn bảng sau khi chọn
+        self.main_page.snack_bar = ft.SnackBar(ft.Text("🚀 Đang chuẩn bị và tải dữ liệu lên Google Sheets..."), bgcolor=ft.Colors.BLUE_800)
         self.main_page.snack_bar.open = True
         try:
             self.main_page.update()
@@ -321,6 +390,7 @@ class LeadsView(ft.Column):
             pass
         
         try:
+            from core.utils.google_sheets_utils import GoogleSheetsExporter
             exporter = GoogleSheetsExporter()
             link = await asyncio.to_thread(exporter.export, self.leads)
             print(f"[UI] Xuất Google Sheets thành công: {link}")
@@ -341,7 +411,7 @@ class LeadsView(ft.Column):
                 hint = "\n👉 Hướng dẫn: Bạn cần tải file JSON từ Google Cloud Console và đặt tên là 'service_account.json' vào thư mục 'data/'."
             
             self.main_page.snack_bar = ft.SnackBar(
-                ft.Text(f"❌ Lỗi Google Sheets: {error_msg}{hint}"), 
+                ft.Text(f"❌ {error_msg}{hint}"), 
                 bgcolor=ft.Colors.RED_700,
                 duration=8000
             )

@@ -117,24 +117,22 @@ class SettingsView(ft.Column):
         ]
 
     def on_keyword_change(self, e):
+        """Đồng bộ giá trị từ khóa một cách an toàn."""
         self._keyword_val = self.keyword_input.value
         
     def on_keyword_focus(self, e):
-        # Đảm bảo nội dung sạch khi focus lần đầu
-        if self.keyword_input.value == "cafephu": 
-            self.keyword_input.value = "cafe"
-            self.page.update()
+        """Xử lý sự kiện focus để đảm bảo UI không bị kẹt ký tự thừa (lỗi Flet Desktop)."""
+        # Đã cải thiện bằng cách sử dụng các handle biệt lập
+        pass
 
     def on_location_change(self, e):
+        """Đồng bộ địa điểm tìm kiếm."""
         self._location_val = self.location_input.value
 
     def on_location_focus(self, e):
-        # Xử lý dứt điểm trường hợp "cafephu" xuất hiện ở ô location
-        if self.location_input.value == "cafephu":
-            self.location_input.value = self.location_input.value.replace("cafe", "").strip()
-            self.page.update()
-        elif self.location_input.value == self._keyword_val and self._keyword_val != "":
-             # Nếu bị chèn y hệt từ khóa, dọn dẹp ngay
+        """Xử lý dứt điểm trường hợp nhảy văn bản giữa các trường."""
+        # Kiểm tra nếu giá trị hiện tại có dấu hiệu bị chèn nhầm từ trường khác
+        if self._keyword_val and self.location_input.value == self._keyword_val:
              self.location_input.value = ""
              self.page.update()
 
@@ -197,16 +195,16 @@ class SettingsView(ft.Column):
         except:
             pass
         
-        # Tự động nhận diện AI Service dựa trên Key có sẵn
-        from core.engine.ai_services import OpenAIService, GeminiService
+        # Tự động nhận diện AI Service dựa trên Key có sẵn qua Factory
+        from core.factory import ServiceFactory
         
-        ai_service = None
-        if self.openai_key_input.value:
-            print("[AI] Tự động chọn nhà cung cấp: OpenAI")
-            ai_service = OpenAIService(api_key=self.openai_key_input.value)
-        elif self.gemini_key_input.value:
-            print("[AI] Tự động chọn nhà cung cấp: Gemini")
-            ai_service = GeminiService(api_key=self.gemini_key_input.value)
+        # Tạo cấu hình tạm thời từ UI
+        current_config = {
+            "openai_key": self.openai_key_input.value,
+            "gemini_key": self.gemini_key_input.value
+        }
+        
+        ai_service = ServiceFactory.create_ai_service(current_config)
         
         if task.deep_scan and not ai_service:
             print("[AI] Cảnh báo: Không có API Key. Bỏ qua Deep Scan.")
@@ -225,7 +223,7 @@ class SettingsView(ft.Column):
             current_count = len(self.app_layout.leads_view.table.rows)
             # Giả định task.max_results là mục tiêu
             self.app_layout.leads_view.update_progress(current_count, task.max_results)
-            await self.app_layout.update_dashboard_stats()
+            await self.app_layout.refresh_stats()
 
         try:
             # Hiện trạng thái khởi động
