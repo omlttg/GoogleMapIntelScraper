@@ -249,8 +249,8 @@ class LeadsView(ft.Column):
         if url:
             try:
                 await self.main_page.launch_url(url)
-            except:
-                pass
+            except Exception as e:
+                print(f"[UI] Không thể mở link {url}: {e}")
 
     def _add_row_to_table_only(self, lead):
         """Hàm phụ trợ để thêm hàng mà không gọi update()."""
@@ -323,34 +323,22 @@ class LeadsView(ft.Column):
         """Hiển thị/Ẩn bảng điều khiển xuất dữ liệu."""
         if not self.leads:
             print("[UI] Không có leads để xuất")
-            self.main_page.snack_bar = ft.SnackBar(ft.Text("Chưa có dữ liệu để xuất!"), bgcolor=ft.Colors.ORANGE_700)
-            self.main_page.snack_bar.open = True
-            try:
-                self.main_page.update()
-            except:
-                pass
+            self.app_layout.show_snackbar("Chưa có dữ liệu để xuất!", ft.Colors.ORANGE_700)
             return
 
         self.export_panel.visible = not self.export_panel.visible
-        try:
-            self.main_page.update()
-        except:
-            pass
+        self.app_layout.safe_update()
 
     def close_export_options(self, e=None):
         """Đóng bảng điều khiển xuất."""
         self.export_panel.visible = False
-        try:
-            self.main_page.update()
-        except:
-            pass
+        self.app_layout.safe_update()
 
     async def export_csv_local_action(self, e):
-        """Lưu file trực tiếp (FilePicker bị vô hiệu hóa để tránh treo app trên Linux)."""
+        """Lưu file trực tiếp (FilePicker bị vô hiệu hóa để tháo gỡ lỗi trên Linux)."""
         path = self.export_path_input.value.strip() or "google_maps_leads.csv"
         # Báo hiệu đang bắt đầu
-        self.main_page.snack_bar = ft.SnackBar(ft.Text(f"📁 Đang lưu trực tiếp vào: {path}..."), bgcolor=ft.Colors.BLUE_800)
-        self.main_page.snack_bar.open = True
+        self.app_layout.show_snackbar(f"📁 Đang lưu trực tiếp vào: {path}...", ft.Colors.BLUE_800)
         await self._perform_csv_save(path)
 
     # on_file_picker_result removed
@@ -359,41 +347,29 @@ class LeadsView(ft.Column):
         try:
             print(f"[UI] Đang lưu vào: {path}")
             # Hiển thị feedback đang xử lý
-            self.main_page.snack_bar = ft.SnackBar(ft.Text(f"⏳ Đang trích xuất và lưu file CSV..."), bgcolor=ft.Colors.BLUE_GREY_800)
-            self.main_page.snack_bar.open = True
-            self.main_page.update()
+            self.app_layout.show_snackbar(f"⏳ Đang trích xuất và lưu file CSV...", ft.Colors.BLUE_GREY_800)
 
             await asyncio.to_thread(export_leads_to_csv, self.leads, path)
             print("[UI] Lưu CSV thành công")
             if self.app_layout:
                 self.app_layout.log_activity(f"Đã xuất {len(self.leads)} leads ra file CSV: {os.path.basename(path)}")
-            self.main_page.snack_bar = ft.SnackBar(ft.Text(f"✅ Đã xuất CSV thành công tại: {path}"), bgcolor=ft.Colors.GREEN_700)
-            self.main_page.snack_bar.open = True
+            self.app_layout.show_snackbar(f"✅ Đã xuất CSV thành công tại: {path}", ft.Colors.GREEN_700)
         except Exception as ex:
             print(f"[UI] Lỗi lưu CSV: {ex}")
-            self.main_page.snack_bar = ft.SnackBar(ft.Text(f"❌ Lỗi: {str(ex)}"), bgcolor=ft.Colors.RED_700)
-            self.main_page.snack_bar.open = True
-        
-        try:
-            self.main_page.update()
-        except:
-            pass
+            self.app_layout.show_snackbar(f"❌ Lỗi: {str(ex)}", ft.Colors.RED_700)
 
     async def export_google_sheets_action(self, e):
         print("[UI] Bắt đầu Xuất sang Google Sheets...")
         self.export_panel.visible = False # Ẩn bảng sau khi chọn
-        self.main_page.snack_bar = ft.SnackBar(ft.Text("🚀 Đang chuẩn bị và tải dữ liệu lên Google Sheets..."), bgcolor=ft.Colors.BLUE_800)
-        self.main_page.snack_bar.open = True
-        try:
-            self.main_page.update()
-        except:
-            pass
+        self.app_layout.show_snackbar("🚀 Đang chuẩn bị và tải dữ liệu lên Google Sheets...", ft.Colors.BLUE_800)
         
         try:
             from core.utils.google_sheets_utils import GoogleSheetsExporter
             exporter = GoogleSheetsExporter()
             link = await asyncio.to_thread(exporter.export, self.leads)
             print(f"[UI] Xuất Google Sheets thành công: {link}")
+            
+            # Helper custom object cho SnackBar có nút bấm không thể đùng show_snackbar mặc định
             self.main_page.snack_bar = ft.SnackBar(
                 content=ft.Row([
                     ft.Text("✅ Xuất Google Sheets thành công!"),

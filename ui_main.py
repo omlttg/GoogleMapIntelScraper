@@ -137,7 +137,24 @@ class AppLayout(ft.Row):
             self.nav_rail.update()
             self.main_page.update()
         except Exception as ex:
-            print(f"[UI] Cảnh báo lỗi cập nhật: {ex}")
+            print(f"[UI] Cảnh báo lỗi cập nhật chuyển tab: {ex}")
+
+    def show_snackbar(self, message: str, color: str = ft.Colors.GREEN_700):
+        """Helper để hiển thị SnackBar tập trung (Clean Code: DRY + Error Handling)."""
+        self.main_page.snack_bar = ft.SnackBar(ft.Text(message), bgcolor=color)
+        self.main_page.snack_bar.open = True
+        self.safe_update()
+
+    def safe_update(self, *controls):
+        """Cập nhật an toàn giao diện tránh ngoại lệ Flet (Clean Code: Error Handling)."""
+        try:
+            if controls:
+                for control in controls:
+                    control.update()
+            else:
+                self.main_page.update()
+        except Exception as e:
+            print(f"[UI] Bỏ qua lỗi cập nhật: {e}")
 
 async def main(page: ft.Page):
     page.title = "G-Map Intel Scraper"

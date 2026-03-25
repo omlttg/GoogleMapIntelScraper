@@ -164,10 +164,7 @@ class SettingsView(ft.Column):
                 has_error = True
         
         if has_error:
-            try:
-                self.page.update()
-            except:
-                pass
+            self.app_layout.safe_update()
             return
 
         # Start scraping in background
@@ -178,8 +175,7 @@ class SettingsView(ft.Column):
             deep_scan=self.deep_scan_switch.value
         )
         
-        self.page.snack_bar = ft.SnackBar(ft.Text("Đang khởi động chiến dịch quét..."))
-        self.page.snack_bar.open = True
+        self.app_layout.show_snackbar("Đang khởi động chiến dịch quét...")
         
         # Chuyển sang tab Leads để xem kết quả
         await self.app_layout.nav_change(1)
@@ -190,10 +186,7 @@ class SettingsView(ft.Column):
     async def run_scraping_flow(self, task):
         # Clear old leads
         self.app_layout.leads_view.table.rows.clear()
-        try:
-            self.app_layout.leads_view.update()
-        except:
-            pass
+        self.app_layout.safe_update(self.app_layout.leads_view)
         
         # Tự động nhận diện AI Service dựa trên Key có sẵn qua Factory
         from core.factory import ServiceFactory
@@ -208,13 +201,9 @@ class SettingsView(ft.Column):
         
         if task.deep_scan and not ai_service:
             print("[AI] Cảnh báo: Không có API Key. Bỏ qua Deep Scan.")
-            self.app_layout.main_page.snack_bar = ft.SnackBar(
-                ft.Text(f"⚠️ Cảnh báo: Thiếu API Key. Tính năng Deep Scan sẽ bị bỏ qua."), 
-                bgcolor=ft.Colors.ORANGE_700
-            )
-            self.app_layout.main_page.snack_bar.open = True
-            self.app_layout.main_page.update()
+            self.app_layout.show_snackbar("⚠️ Cảnh báo: Thiếu API Key. Tính năng Deep Scan sẽ bị bỏ qua.", ft.Colors.ORANGE_700)
             task.deep_scan = False
+
 
         self.app_layout.coordinator.ai_service = ai_service
 
@@ -230,14 +219,9 @@ class SettingsView(ft.Column):
             self.app_layout.leads_view.update_progress(0, task.max_results, "Đang khởi động trình duyệt...")
             await self.app_layout.coordinator.run_task(task, on_lead_found=on_lead_discovered)
             self.app_layout.leads_view.stop_progress("Chiến dịch hoàn tất! Đã thu thập đủ dữ liệu.")
-            self.app_layout.main_page.snack_bar = ft.SnackBar(ft.Text("Hoàn tất chiến dịch quét!"), bgcolor=ft.Colors.GREEN_700)
+            self.app_layout.show_snackbar("Hoàn tất chiến dịch quét!", ft.Colors.GREEN_700)
         except Exception as ex:
-            self.app_layout.main_page.snack_bar = ft.SnackBar(ft.Text(f"Lỗi: {str(ex)}"), bgcolor=ft.Colors.RED_700)
-        
-        try:
-            self.app_layout.main_page.update()
-        except:
-            pass
+            self.app_layout.show_snackbar(f"Lỗi: {str(ex)}", ft.Colors.RED_700)
 
     async def save_api_config(self, e):
         from core.utils.config_utils import save_config
@@ -245,6 +229,4 @@ class SettingsView(ft.Column):
         self.config["gemini_key"] = self.gemini_key_input.value
         # active_provider giờ được tự động nhận diện
         save_config(self.config)
-        self.page.snack_bar = ft.SnackBar(ft.Text("Cấu hình API đã được lưu!"), bgcolor=ft.Colors.GREEN_700)
-        self.page.snack_bar.open = True
-        self.page.update()
+        self.app_layout.show_snackbar("Cấu hình API đã được lưu!", ft.Colors.GREEN_700)

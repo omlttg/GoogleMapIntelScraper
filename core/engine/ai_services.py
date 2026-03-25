@@ -75,7 +75,9 @@ class GeminiService(AIService):
     def __init__(self, api_key: str, model: str = "gemini-1.5-flash"):
         from google import genai
         self.api_key = api_key
-        self.model_name = model
+        # SDK mới (google-genai) sử dụng tên model gemini-2.0-flash (phổ biến) hoặc 1.5-flash
+        # Cập nhật model name tương thích với SDK mới
+        self.model_name = "gemini-2.0-flash" if model == "gemini-1.5-flash" or model == "gemini-2.5-flash" else model
         self.client = genai.Client(api_key=api_key)
 
     async def extract_business_intel(self, html_content: str, website_url: str) -> dict:

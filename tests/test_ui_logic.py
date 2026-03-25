@@ -8,6 +8,12 @@ class MockAppLayout:
         self.main_page = MagicMock()
         self.coordinator = MagicMock()
         self.leads_view = MagicMock()
+    
+    def safe_update(self, *args, **kwargs):
+        pass
+        
+    def show_snackbar(self, *args, **kwargs):
+        pass
 
 def test_settings_view_state_isolation():
     """Kiểm tra logic cô lập trạng thái giữa các trường nhập liệu."""
